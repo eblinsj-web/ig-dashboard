@@ -12,7 +12,7 @@ dotenv.config();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 
-const { ACCESS_TOKEN, IG_ACCOUNT_ID, PORT = 3000, RUN_ON_START } = process.env;
+const { ACCESS_TOKEN, IG_ACCOUNT_ID, PORT = 3000, RUN_ON_START, CRON_SECRET } = process.env;
 
 if (!ACCESS_TOKEN || !IG_ACCOUNT_ID) {
   console.error(
@@ -23,6 +23,21 @@ if (!ACCESS_TOKEN || !IG_ACCOUNT_ID) {
 }
 
 app.use(express.static(join(__dirname, "public")));
+
+// 외부 스케줄러가 매일 자정에 호출하는 수집 통로.
+// ?key=비밀열쇠 가 맞아야 실행됨 (아무나 수집 못 돌리게 보호).
+app.get("/api/collect", async (req, res) => {
+  if (!CRON_SECRET || req.query.key !== CRON_SECRET) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  try {
+    const result = await runCollection();
+    res.json({ ok: true, result });
+  } catch (err) {
+    console.error("[/api/collect]", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 // 메인: 최근 100개를 수집해 월별 집계 + 최근 20개 카드 + 7일 추이를 한번에 반환
 app.get("/api/dashboard", async (req, res) => {

@@ -6,6 +6,7 @@
 import cron from "node-cron";
 import { CHANNELS } from "./collectors.js";
 import { saveSnapshot } from "./db.js";
+import { maybeRefreshToken } from "./token.js";
 
 // 한국 날짜 문자열 (YYYY-MM-DD). offsetDays=-1 이면 전날.
 function kstDateString(offsetDays = 0, base = new Date()) {
@@ -28,6 +29,13 @@ function ts() {
 
 // 한 번의 수집 실행. server.js에서도 즉시 실행용으로 재사용합니다.
 export async function runCollection() {
+  // 수집 전, 토큰이 오래됐으면 자동 갱신 (50일 기준)
+  try {
+    await maybeRefreshToken();
+  } catch (e) {
+    console.log("  ⚠️  토큰 갱신 체크 중 오류:", e.message);
+  }
+
   const active = CHANNELS.filter((c) => c.enabled);
   console.log(`\n[${ts()}] 수집 시작 — 대상 채널: ${active.map((c) => c.name).join(", ")}`);
 

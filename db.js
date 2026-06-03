@@ -26,6 +26,33 @@ export async function initDb() {
       collected_at TIMESTAMPTZ DEFAULT now()
     )
   `;
+  // 토큰 등 설정값을 저장하는 키-값 테이블
+  await sql`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at TIMESTAMPTZ DEFAULT now()
+    )
+  `;
+}
+
+// 설정값 저장 (있으면 덮어쓰기)
+export async function setSetting(key, value) {
+  if (!sql) throw new Error("DATABASE_URL 미설정");
+  await sql`
+    INSERT INTO settings (key, value, updated_at)
+    VALUES (${key}, ${value}, now())
+    ON CONFLICT (key) DO UPDATE
+      SET value = EXCLUDED.value, updated_at = now()
+  `;
+}
+
+// 설정값 조회 ({ value, updatedAt } 또는 null)
+export async function getSetting(key) {
+  if (!sql) return null;
+  const rows = await sql`SELECT value, updated_at FROM settings WHERE key = ${key}`;
+  if (!rows.length) return null;
+  return { value: rows[0].value, updatedAt: rows[0].updated_at };
 }
 
 // 하루치 스냅샷 저장 (같은 날짜면 덮어쓰기)

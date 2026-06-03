@@ -3,10 +3,11 @@
 // 나중에 각 API를 연동할 자리(placeholder)로 비워둡니다.
 
 import dotenv from "dotenv";
+import { getCurrentToken } from "./token.js";
 dotenv.config();
 
 const GRAPH = "https://graph.facebook.com/v21.0";
-const { ACCESS_TOKEN, IG_ACCOUNT_ID } = process.env;
+const { IG_ACCOUNT_ID } = process.env;
 
 const METRICS = ["reach", "views", "likes", "comments", "saved", "shares"];
 
@@ -21,12 +22,12 @@ async function graph(url) {
   return json;
 }
 
-async function fetchInsights(mediaId) {
+async function fetchInsights(mediaId, token) {
   const out = {};
   const tryMetrics = async (metrics) => {
     const url =
       `${GRAPH}/${mediaId}/insights` +
-      `?metric=${metrics.join(",")}&access_token=${ACCESS_TOKEN}`;
+      `?metric=${metrics.join(",")}&access_token=${token}`;
     const json = await graph(url);
     for (const m of json.data || []) {
       out[m.name] = m.values?.[0]?.value ?? 0;
@@ -49,8 +50,9 @@ async function fetchInsights(mediaId) {
 // 인스타그램: 게시물 + 인사이트 수집.
 // maxItems만큼 페이징해서 가져옵니다(월별 집계용으로 넉넉히).
 export async function collectInstagram(maxItems = 100) {
-  if (!ACCESS_TOKEN || !IG_ACCOUNT_ID) {
-    throw new Error("ACCESS_TOKEN / IG_ACCOUNT_ID 가 .env에 설정되지 않음");
+  const token = await getCurrentToken();
+  if (!token || !IG_ACCOUNT_ID) {
+    throw new Error("ACCESS_TOKEN / IG_ACCOUNT_ID 가 설정되지 않음");
   }
 
   // 페이징으로 maxItems까지 수집
@@ -58,7 +60,7 @@ export async function collectInstagram(maxItems = 100) {
   let url =
     `${GRAPH}/${IG_ACCOUNT_ID}/media` +
     `?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp` +
-    `&limit=50&access_token=${ACCESS_TOKEN}`;
+    `&limit=50&access_token=${token}`;
   while (url && items.length < maxItems) {
     const page = await graph(url);
     items.push(...(page.data || []));
@@ -68,7 +70,7 @@ export async function collectInstagram(maxItems = 100) {
 
   const posts = await Promise.all(
     sliced.map(async (item) => {
-      const ins = await fetchInsights(item.id);
+      const ins = await fetchInsights(item.id, token);
       const reach = ins.reach ?? 0;
       const likes = ins.likes ?? 0;
       const comments = ins.comments ?? 0;
@@ -96,7 +98,7 @@ export async function collectInstagram(maxItems = 100) {
   let followers = null;
   try {
     const acct = await graph(
-      `${GRAPH}/${IG_ACCOUNT_ID}?fields=followers_count,username&access_token=${ACCESS_TOKEN}`
+      `${GRAPH}/${IG_ACCOUNT_ID}?fields=followers_count,username&access_token=${token}`
     );
     followers = acct.followers_count ?? null;
     if (followers == null) {

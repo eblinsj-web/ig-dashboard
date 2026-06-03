@@ -39,6 +39,25 @@ app.get("/api/collect", async (req, res) => {
   }
 });
 
+// 진단용: DB에 든 날짜와 팔로워 수를 그대로 보여줌 (열쇠 보호). 확인 후 제거 예정.
+app.get("/api/debug", async (req, res) => {
+  if (!CRON_SECRET || req.query.key !== CRON_SECRET) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  try {
+    const { getAllSnapshots } = await import("./db.js");
+    const snaps = await getAllSnapshots();
+    const summary = Object.entries(snaps).map(([date, snap]) => ({
+      date,
+      followers: snap?.channels?.instagram?.followers ?? null,
+      posts: snap?.channels?.instagram?.posts?.length ?? 0,
+    }));
+    res.json({ count: summary.length, dates: summary });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 메인: 최근 100개를 수집해 월별 집계 + 최근 20개 카드 + 7일 추이를 한번에 반환
 app.get("/api/dashboard", async (req, res) => {
   try {

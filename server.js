@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { collectInstagram } from "./collectors.js";
-import { startScheduler, runCollection } from "./scheduler.js";
+import { runCollection } from "./scheduler.js";
 import { getFollowerTrend, getMonthlyRollup } from "./aggregate.js";
 import { initDb } from "./db.js";
 
@@ -36,37 +36,6 @@ app.get("/api/collect", async (req, res) => {
   } catch (err) {
     console.error("[/api/collect]", err.message);
     res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// 진단용: DB에 든 날짜와 팔로워 수를 그대로 보여줌 (열쇠 보호). 확인 후 제거 예정.
-app.get("/api/debug", async (req, res) => {
-  if (!CRON_SECRET || req.query.key !== CRON_SECRET) {
-    return res.status(403).json({ error: "forbidden" });
-  }
-  try {
-    const { getAllSnapshots } = await import("./db.js");
-    const snaps = await getAllSnapshots();
-    const summary = Object.entries(snaps).map(([date, snap]) => ({
-      date,
-      followers: snap?.channels?.instagram?.followers ?? null,
-      posts: snap?.channels?.instagram?.posts?.length ?? 0,
-    }));
-
-    // 팔로워 요청을 직접 쏴서 원본 응답 확인
-    let followerProbe;
-    try {
-      const r = await fetch(
-        `https://graph.facebook.com/v21.0/${IG_ACCOUNT_ID}?fields=followers_count,username&access_token=${ACCESS_TOKEN}`
-      );
-      followerProbe = await r.json();
-    } catch (e) {
-      followerProbe = { fetchError: e.message };
-    }
-
-    res.json({ count: summary.length, dates: summary, followerProbe });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
   }
 });
 
@@ -122,7 +91,8 @@ app.listen(PORT, async () => {
   } catch (e) {
     console.log("⚠️  DB 초기화 실패 —", e.message);
   }
-  startScheduler();
+  // 자정 수집은 외부 스케줄러(cron-job.org)가 /api/collect 를 호출해 처리.
+  // (Render 무료는 앱이 잠들면 내부 cron이 안 돌아서, 외부 스케줄러를 사용)
   if (RUN_ON_START === "1") {
     runCollection().catch((e) => console.error("초기 수집 오류:", e));
   }

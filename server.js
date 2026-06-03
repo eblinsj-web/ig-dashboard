@@ -32,7 +32,12 @@ app.get("/api/collect", async (req, res) => {
   }
   try {
     const result = await runCollection();
-    res.json({ ok: true, result });
+    // 응답은 짧게: 채널별 성공/항목수 요약만 (전체 데이터를 돌려주면 너무 큼)
+    const summary = {};
+    for (const [name, val] of Object.entries(result || {})) {
+      summary[name] = val?.error ? { ok: false } : { ok: true, posts: val?.posts?.length ?? 0 };
+    }
+    res.json({ ok: true, summary });
   } catch (err) {
     console.error("[/api/collect]", err.message);
     res.status(500).json({ ok: false, error: err.message });

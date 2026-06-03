@@ -52,7 +52,19 @@ app.get("/api/debug", async (req, res) => {
       followers: snap?.channels?.instagram?.followers ?? null,
       posts: snap?.channels?.instagram?.posts?.length ?? 0,
     }));
-    res.json({ count: summary.length, dates: summary });
+
+    // 팔로워 요청을 직접 쏴서 원본 응답 확인
+    let followerProbe;
+    try {
+      const r = await fetch(
+        `https://graph.facebook.com/v21.0/${IG_ACCOUNT_ID}?fields=followers_count,username&access_token=${ACCESS_TOKEN}`
+      );
+      followerProbe = await r.json();
+    } catch (e) {
+      followerProbe = { fetchError: e.message };
+    }
+
+    res.json({ count: summary.length, dates: summary, followerProbe });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

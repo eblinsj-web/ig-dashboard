@@ -92,7 +92,21 @@ export async function collectInstagram(maxItems = 100) {
     })
   );
 
-  return { posts };
+  // 계정 기본 정보 — 팔로워 수 (followers_count는 인사이트가 아닌 기본 필드)
+  let followers = null;
+  try {
+    const acct = await graph(
+      `${GRAPH}/${IG_ACCOUNT_ID}?fields=followers_count,username&access_token=${ACCESS_TOKEN}`
+    );
+    followers = acct.followers_count ?? null;
+    if (followers == null) {
+      console.log("  ⚠️  팔로워 수 응답에 followers_count 없음:", JSON.stringify(acct));
+    }
+  } catch (e) {
+    console.log("  ⚠️  팔로워 수 가져오기 실패:", e.message);
+  }
+
+  return { followers, posts };
 }
 
 // ── 스레드: 추후 Threads API 연동 자리 ───────────────────────────────

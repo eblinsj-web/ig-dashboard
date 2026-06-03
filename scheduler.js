@@ -1,16 +1,11 @@
 // 매일 자정 0시(한국 시간) 자동 수집 스케줄러.
 // - Promise.allSettled: 한 채널이 실패해도 나머지는 계속 진행
 // - 성공/실패를 콘솔에 로그
-// - 결과는 data/YYYY-MM-DD.json 에 저장
+// - 결과는 Neon DB(snapshots 테이블)에 저장
 
 import cron from "node-cron";
-import { writeFile, mkdir } from "fs/promises";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
 import { CHANNELS } from "./collectors.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = join(__dirname, "data");
+import { saveSnapshot } from "./db.js";
 
 // 한국 날짜 문자열 (YYYY-MM-DD). offsetDays=-1 이면 전날.
 function kstDateString(offsetDays = 0, base = new Date()) {
@@ -56,15 +51,13 @@ export async function runCollection() {
     }
   });
 
-  // 날짜별 JSON으로 저장.
-  // 자정 0시에 돌면 "방금 끝난 어제"가 수집 대상이므로 파일명은 전날(-1).
+  // DB에 저장.
+  // 자정 0시에 돌면 "방금 끝난 어제"가 수집 대상이므로 날짜는 전날(-1).
   try {
-    await mkdir(DATA_DIR, { recursive: true });
     const date = kstDateString(-1);
-    const path = join(DATA_DIR, `${date}.json`);
     const payload = { collectedAt: new Date().toISOString(), channels: collected };
-    await writeFile(path, JSON.stringify(payload, null, 2), "utf-8");
-    console.log(`  💾 저장 완료 → data/${date}.json`);
+    await saveSnapshot(date, payload);
+    console.log(`  💾 저장 완료 → DB (${date})`);
   } catch (e) {
     console.log(`  ⚠️  저장 실패 — ${e.message}`);
   }

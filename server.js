@@ -5,6 +5,7 @@ import { dirname, join } from "path";
 import { collectInstagram } from "./collectors.js";
 import { startScheduler, runCollection } from "./scheduler.js";
 import { getFollowerTrend, getMonthlyRollup } from "./aggregate.js";
+import { initDb } from "./db.js";
 
 dotenv.config();
 
@@ -67,8 +68,14 @@ app.get("/api/posts", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`\n  IG dashboard running → http://localhost:${PORT}\n`);
+  try {
+    await initDb();
+    console.log("🗄️  DB 준비 완료 (snapshots 테이블)");
+  } catch (e) {
+    console.log("⚠️  DB 초기화 실패 —", e.message);
+  }
   startScheduler();
   if (RUN_ON_START === "1") {
     runCollection().catch((e) => console.error("초기 수집 오류:", e));

@@ -1,31 +1,16 @@
 // 집계 로직.
-// - getFollowerTrend: data/ 스냅샷의 일별 팔로워 수 + 전월 말일 대비 증감
+// - getFollowerTrend: DB 스냅샷의 일별 팔로워 수 + 전월 말일 대비 증감
 // - getMonthlyRollup: 게시물 timestamp 기준 2026년 월별 집계
 
-import { readFile, readdir } from "fs/promises";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = join(__dirname, "data");
+import { getAllSnapshots } from "./db.js";
 
 // 모든 스냅샷을 읽어 { "YYYY-MM-DD": followerCount } 맵으로 반환
 async function readFollowerByDate() {
-  let files = [];
-  try {
-    files = (await readdir(DATA_DIR)).filter((f) => f.endsWith(".json"));
-  } catch {
-    return {}; // data 폴더 없음
-  }
+  const snaps = await getAllSnapshots();
   const byDate = {};
-  for (const f of files) {
-    try {
-      const snap = JSON.parse(await readFile(join(DATA_DIR, f), "utf-8"));
-      const followers = snap?.channels?.instagram?.followers;
-      if (followers != null) byDate[f.replace(".json", "")] = followers;
-    } catch {
-      /* 깨진 파일 건너뜀 */
-    }
+  for (const [date, snap] of Object.entries(snaps)) {
+    const followers = snap?.channels?.instagram?.followers;
+    if (followers != null) byDate[date] = followers;
   }
   return byDate;
 }

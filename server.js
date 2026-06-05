@@ -5,7 +5,7 @@ import { dirname, join } from "path";
 import { collectInstagram } from "./collectors.js";
 import { runCollection } from "./scheduler.js";
 import { getFollowerTrend, getMonthlyRollup } from "./aggregate.js";
-import { initDb } from "./db.js";
+import { initDb, saveSnapshot } from "./db.js";
 
 dotenv.config();
 
@@ -44,6 +44,25 @@ app.get("/api/collect", async (req, res) => {
     res.json({ ok: true, summary });
   } catch (err) {
     console.error("[/api/collect]", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/seed", async (req, res) => {
+  if (!CRON_SECRET || req.query.key !== CRON_SECRET) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  const { date, followers } = req.query;
+  if (!date || !followers) {
+    return res.status(400).json({ error: "date 와 followers 가 필요합니다" });
+  }
+  try {
+    await saveSnapshot(date, {
+      collectedAt: new Date().toISOString(),
+      channels: { instagram: { followers: Number(followers), posts: [] } },
+    });
+    res.json({ ok: true, date, followers: Number(followers) });
+  } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
 });

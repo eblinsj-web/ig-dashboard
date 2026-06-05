@@ -24,6 +24,10 @@ if (!ACCESS_TOKEN || !IG_ACCOUNT_ID) {
 
 app.use(express.static(join(__dirname, "public")));
 
+app.get("/ping", (req, res) => {
+  res.type("text/plain").send("ok");
+});
+
 // 외부 스케줄러가 매일 자정에 호출하는 수집 통로.
 // ?key=비밀열쇠 가 맞아야 실행됨 (아무나 수집 못 돌리게 보호).
 app.get("/api/collect", async (req, res) => {
